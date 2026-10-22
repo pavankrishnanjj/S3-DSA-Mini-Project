@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Railway Ticket Management System</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#5f6b76;--bd:#dde1e6;--ac:#0b5fff;--ok:#12803c;--wl:#b45309;--er:#c62828}
+@media (prefers-color-scheme:dark){:root{--bg:#14171a;--card:#1d2126;--tx:#e8eaed;--mu:#9aa4ae;--bd:#2f353c;--ac:#6ea0ff;--ok:#4ade80;--wl:#fbbf24;--er:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);line-height:1.45}
+header{padding:20px 16px 4px;max-width:1100px;margin:auto}
+h1{font-size:1.4rem;margin:0}header p{color:var(--mu);margin:4px 0 0;font-size:.9rem}
+main{max-width:1100px;margin:auto;padding:12px 16px 40px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
+.wide{grid-column:1/-1}
+h2{font-size:1rem;margin:0 0 10px}
+label{display:block;font-size:.8rem;color:var(--mu);margin:8px 0 3px}
+input,select,button{font:inherit;padding:8px 10px;border-radius:7px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);width:100%}
+button{background:var(--ac);color:#fff;border:0;cursor:pointer;font-weight:600;margin-top:10px}
+button.sec{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+button.dng{background:var(--er)}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.tbl{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd);white-space:nowrap}th{color:var(--mu);font-weight:600}
+.tag{padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:600;border:1px solid currentColor}
+.CNF{color:var(--ok)}.WL{color:var(--wl)}
+.seats{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.seat{width:30px;height:30px;border-radius:6px;display:grid;place-items:center;font-size:.7rem;border:1px solid var(--bd);color:var(--mu)}
+.seat.f{background:var(--ok);color:#fff;border-color:var(--ok)}
+.tr{border-top:1px solid var(--bd);padding:10px 0}.tr:first-of-type{border:0;padding-top:0}
+#msg{min-height:1.3em;font-size:.85rem;margin-top:8px}
+#log{font-size:.8rem;color:var(--mu);max-height:160px;overflow:auto;padding-left:18px;margin:0}
+.dsa{font-size:.85rem;color:var(--mu);margin:0;padding-left:18px}.dsa b{color:var(--tx)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚆 Railway Ticket Management System</h1>
+  <p>DSA mini project: every structure below is hand-built (no built-in Map or Queue).</p>
+</header>
+<main>
+  <section class="card">
+    <h2>Book a ticket</h2>
+    <label for="nm">Passenger name</label><input id="nm" maxlength="30">
+    <div class="row">
+      <div><label for="ag">Age</label><input id="ag" type="number" min="1" max="120"></div>
+      <div><label for="tn">Train</label><select id="tn"></select></div>
+    </div>
+    <button id="bk">Book ticket</button>
+    <div id="msg" role="status"></div>
+  </section>
+
+  <section class="card">
+    <h2>Search / cancel by PNR</h2>
+    <label for="pn">PNR (10 digits)</label><input id="pn" inputmode="numeric" maxlength="10">
+    <div class="row">
+      <button id="sr" class="sec">Search</button>
+      <button id="cn" class="dng">Cancel</button>
+    </div>
+    <button id="rs" class="sec">Restore last cancelled</button>
+    <div id="res" style="margin-top:10px;font-size:.9rem"></div>
+  </section>
+
+  <section class="card wide">
+    <h2>Train status</h2>
+    <div id="trains"></div>
+  </section>
+
+  <section class="card wide">
+    <h2>All bookings</h2>
+    <div class="row" style="max-width:320px;margin-bottom:8px">
+      <select id="sk"><option value="name">Sort by name</option><option value="age">Sort by age</option><option value="pnr">Sort by PNR</option></select>
+    </div>
+    <div class="tbl"><table><thead><tr><th>PNR</th><th>Name</th><th>Age</th><th>Train</th><th>Status</th><th>Seat</th></tr></thead><tbody id="bt"></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Where each DSA concept is used</h2>
+    <ul class="dsa">
+      <li><b>Hash table (chaining)</b>: PNR lookup, O(1) average</li>
+      <li><b>Linked-list queue</b>: waiting list per train (FIFO promotion)</li>
+      <li><b>Stack</b>: cancelled bookings, restore the latest first</li>
+      <li><b>Array</b>: seat map per train, linear scan for a free seat</li>
+      <li><b>Merge sort</b>: sorted bookings table, O(n log n)</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Activity log</h2>
+    <ol id="log" reversed></ol>
+  </section>
+</main>
+
+<script>
+// ---------- Data structures ----------
+class Node { constructor(v){ this.v = v; this.next = null; } }
+
+class Queue {                       // singly linked list with head and tail
+  constructor(){ this.head = null; this.tail = null; this.size = 0; }
+  enqueue(v){
+    const n = new Node(v);
+    if (this.tail) this.tail.next = n; else this.head = n;
+    this.tail = n; this.size++;
+  }
+  dequeue(){
+    if (!this.head) return null;
+    const v = this.head.v;
+    this.head = this.head.next;
+    if (!this.head) this.tail = null;
+    this.size--; return v;
+  }
+  remove(pred){                     // delete first node matching pred
+    let p = null, c = this.head;
+    while (c){
+      if (pred(c.v)){
+        if (p) p.next = c.next; else this.head = c.next;
+        if (c === this.tail) this.tail = p;
+        this.size--; return c.v;
+      }
+      p = c; c = c.next;
+    }
+    return null;
+  }
+  toArray(){ const a = []; for (let c = this.head; c; c = c.next) a.push(c.v); return a; }
+}
+
+class Stack {
+  constructor(){ this.a = []; }
+  push(v){ this.a.push(v); }
+  pop(){ return this.a.length ? this.a.pop() : null; }
+}
+
+class HashTable {                   // separate chaining
+  constructor(n = 31){ this.b = Array.from({ length: n }, () => []); }
+  hash(k){ let h = 0; for (const ch of String(k)) h = (h * 31 + ch.charCodeAt(0)) % this.b.length; return h; }
+  set(k, v){ this.b[this.hash(k)].push([k, v]); }
+  get(k){ const e = this.b[this.hash(k)].find(e => e[0] === k); return e ? e[1] : null; }
+  delete(k){
+    const bucket = this.b[this.hash(k)];
+    const i = bucket.findIndex(e => e[0] === k);
+    return i < 0 ? null : bucket.splice(i, 1)[0][1];
+  }
+  values(){ return this.b.flat().map(e => e[1]); }
+}
+
+function mergeSort(arr, cmp){
+  if (arr.length < 2) return arr;
+  const m = arr.length >> 1;
+  const L = mergeSort(arr.slice(0, m), cmp), R = mergeSort(arr.slice(m), cmp);
+  const out = []; let i = 0, j = 0;
+  while (i < L.length && j < R.length) out.push(cmp(L[i], R[j]) <= 0 ? L[i++] : R[j++]);
+  return out.concat(L.slice(i), R.slice(j));
+}
+
+// ---------- App state ----------
+const trains = [
+  { no: "T101", name: "Coastal Express",  route: "Thrissur → Chennai", cap: 5 },
+  { no: "T202", name: "Desert Queen",     route: "Ernakulam → Jaipur", cap: 6 },
+  { no: "T303", name: "Western Mail",     route: "Kozhikode → Mumbai", cap: 4 }
+].map(t => ({ ...t, seats: Array(t.cap).fill(null), wl: new Queue() }));
+
+const bookings = new HashTable();
+const cancelled = new Stack();
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+function log(t){ const li = document.createElement("li"); li.textContent = t; $("log").prepend(li); }
+function say(t, ok = true){ const m = $("msg"); m.textContent = t; m.style.color = ok ? "var(--ok)" : "var(--er)"; }
+function newPNR(){ let p; do { p = String(Math.floor(1e9 + Math.random() * 9e9)); } while (bookings.get(p)); return p; }
+
+// ---------- Operations ----------
+function book(name, age, trainNo){
+  const t = trains.find(x => x.no === trainNo);
+  const b = { pnr: newPNR(), name, age, train: t.no, status: "WL", seat: null };
+  const free = t.seats.indexOf(null);             // linear scan of seat array
+  if (free >= 0){ b.status = "CNF"; b.seat = free + 1; t.seats[free] = b.pnr; }
+  else t.wl.enqueue(b.pnr);
+  bookings.set(b.pnr, b);
+  log(`${b.name} booked on ${t.no}: ${b.status}${b.seat ? " seat " + b.seat : " (WL " + t.wl.size + ")"}`);
+  return b;
+}
+
+function cancel(pnr){
+  const b = bookings.delete(pnr);
+  if (!b) return null;
+  const t = trains.find(x => x.no === b.train);
+  if (b.status === "CNF"){
+    t.seats[b.seat - 1] = null;
+    const next = t.wl.dequeue();                  // FIFO promotion
+    if (next){
+      const nb = bookings.get(next);
+      nb.status = "CNF"; nb.seat = b.seat; t.seats[b.seat - 1] = next;
+      log(`${nb.name} promoted from waiting list to seat ${nb.seat} on ${t.no}`);
+    }
+  } else t.wl.remove(p => p === pnr);
+  cancelled.push(b);
+  log(`${b.name} cancelled PNR ${pnr}`);
+  return b;
+}
+
+// ---------- Rendering ----------
+function render(){
+  $("trains").innerHTML = trains.map(t => `
+    <div class="tr"><b>${t.no} ${esc(t.name)}</b> <span style="color:var(--mu)">${esc(t.route)}</span>
+    <div class="seats">${t.seats.map((s, i) => `<div class="seat ${s ? "f" : ""}" title="${s || "free"}">${i + 1}</div>`).join("")}</div>
+    <small style="color:var(--mu)">Waiting list (${t.wl.size}): ${t.wl.toArray().map(p => esc(bookings.get(p).name)).join(" → ") || "empty"}</small></div>`).join("");
+
+  const cmp = { name: (a, b) => a.name.localeCompare(b.name), age: (a, b) => a.age - b.age, pnr: (a, b) => a.pnr.localeCompare(b.pnr) }[$("sk").value];
+  const rows = mergeSort(bookings.values(), cmp);
+  $("bt").innerHTML = rows.length ? rows.map(b => `<tr><td>${b.pnr}</td><td>${esc(b.name)}</td><td>${b.age}</td><td>${b.train}</td><td><span class="tag ${b.status}">${b.status}</span></td><td>${b.seat || "-"}</td></tr>`).join("")
+    : `<tr><td colspan="6" style="color:var(--mu)">No bookings yet</td></tr>`;
+}
+
+// ---------- Events ----------
+$("tn").innerHTML = trains.map(t => `<option value="${t.no}">${t.no} · ${esc(t.name)}</option>`).join("");
+
+$("bk").onclick = () => {
+  const name = $("nm").value.trim(), age = parseInt($("ag").value, 10);
+  if (!name || !(age > 0 && age < 121)) return say("Enter a valid name and age.", false);
+  const b = book(name, age, $("tn").value);
+  say(`PNR ${b.pnr}: ${b.status === "CNF" ? "confirmed, seat " + b.seat : "waiting list"}`);
+  $("nm").value = ""; $("ag").value = ""; render();
+};
+
+$("sr").onclick = () => {
+  const b = bookings.get($("pn").value.trim());
+  $("res").innerHTML = b ? `<b>${esc(b.name)}</b>, age ${b.age}<br>${b.train} · <span class="tag ${b.status}">${b.status}</span> · seat ${b.seat || "-"}` : "No booking found for that PNR.";
+};
+
+$("cn").onclick = () => {
+  const b = cancel($("pn").value.trim());
+  $("res").textContent = b ? `Cancelled ${b.name}'s ticket.` : "No booking found for that PNR.";
+  render();
+};
+
+$("rs").onclick = () => {
+  const b = cancelled.pop();
+  if (!b) return $("res").textContent = "Nothing to restore.";
+  const nb = book(b.name, b.age, b.train);
+  $("res").innerHTML = `Restored ${esc(nb.name)} with new PNR ${nb.pnr} (${nb.status}).`;
+  render();
+};
+
+$("sk").onchange = render;
+render();
+</script>
+</body>
+</html>
